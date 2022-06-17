@@ -1,0 +1,272 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: This template creates server stack for udagram project
+
+Parameters:
+  EnvironmentName:
+    Description: Base name for all resources in this template.
+    Type: String
+    # EC2 default AMI to use to deploy the instance
+  EC2InstanceAMI:
+    Description: Ec2 instance AMI
+    Type: String
+
+Resources:
+  # IAM role to allow the EC2 instance to access files from the S3 bucket
+  S3BucketAccessfromEC2:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+  # Ec2 isntance profile
+  ServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref S3BucketAccessfromEC2
+
+  # Loadbalancer security group to allow Ingress and and Egress http
+  LoadBalancerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: http access to Load Balancer
+      VpcId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-VPC"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  # Ec2 instance security group to allow ssh anf http protocols
+  WebServerSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access http from the ec2 instance and allow ssh
+      VpcId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-VPC"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+
+  # EC2 launch Configuration to deploy ec2 initial configurations
+  WebAppLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash  
+          sudo apt-get update -y
+          sudo apt-get install apache2 -y
+          sudo systemctl start apache2.service
+          cd /var/www/html
+          echo "<html lang="en">" > index.html
+          echo "	<head>" >> index.html
+          echo "	<!DOCTYPE html>" >> index.html
+          echo "	<meta charset="UTF-8">" >> index.html
+          echo "	<meta http-equiv="X-UA-Compatible" content="IE=edge">" >> index.html
+          echo "	<meta name="viewport" content="width=device-width, initial-scale=1.0">" >> index.html
+          echo "	<title>Welcome</title>" >> index.html
+          echo "	<style>@import "compass/css3";" >> index.html
+          echo "" >> index.html
+          echo "		@import url(https://fonts.googleapis.com/css?family=Lato:300,400,700|Dosis:200,400,600);" >> index.html
+          echo "		" >> index.html
+          echo "		body {" >> index.html
+          echo "		  background-color: #252527;" >> index.html
+          echo "		}" >> index.html
+          echo "		#main {" >> index.html
+          echo "		  font-family: Dosis;" >> index.html
+          echo "		  font-weight: 200;" >> index.html
+          echo "		  position: absolute;" >> index.html
+          echo "		  text-align: center;" >> index.html
+          echo "		  display: block;" >> index.html
+          echo "		  color: #fff;" >> index.html
+          echo "		  top: 25%;" >> index.html
+          echo "		  width: 100%;" >> index.html
+          echo "		  margin-top: -55px;" >> index.html
+          echo "		  text-transform: uppercase;" >> index.html
+          echo "		  letter-spacing: 1px;" >> index.html
+          echo "		  -webkit-transform-style: preserve-3d;" >> index.html
+          echo "		  -moz-transform-style: preserve-3d;" >> index.html
+          echo "		  transform-style: preserve-3d;" >> index.html
+          echo "		  -webkit-transform: translate3d(0,0,0);" >> index.html
+          echo "		  -moz-transform: translate3d(0,0,0);" >> index.html
+          echo "		  transform: translate3d(0,0,0);" >> index.html
+          echo "		  opacity: 0;" >> index.html
+          echo "		  -webkit-animation: anim 3.2s ease-out forwards 1s;" >> index.html
+          echo "		  animation: anim 3.2s ease-out forwards 1s;" >> index.html
+          echo "		}" >> index.html
+          echo "		strong {" >> index.html
+          echo "		  display: block;" >> index.html
+          echo "		  font-weight: 400;" >> index.html
+          echo "		}" >> index.html
+          echo "		" >> index.html
+          echo "		" >> index.html
+          echo "		@-webkit-keyframes anim {" >> index.html
+          echo "		  0% {" >> index.html
+          echo "			text-shadow: 0 0 50px #fff;" >> index.html
+          echo "			letter-spacing: 80px;" >> index.html
+          echo "			opacity: 0;" >> index.html
+          echo "			-webkit-transform: rotateY(-90deg);" >> index.html
+          echo "		  }" >> index.html
+          echo "		  50% {" >> index.html
+          echo "			text-shadow: 0 0 1px #fff;" >> index.html
+          echo "			opacity: 0.8;" >> index.html
+          echo "			-webkit-transform: rotateY(0deg);" >> index.html
+          echo "		  }" >> index.html
+          echo "		  75% {" >> index.html
+          echo "			text-shadow: 0 0 1px #fff;" >> index.html
+          echo "			opacity: 0.8;" >> index.html
+          echo "			-webkit-transform: rotateY(0deg) translateZ(60px);" >> index.html
+          echo "		  }" >> index.html
+          echo "		  100% {" >> index.html
+          echo "			text-shadow: 0 0 1px #fff;" >> index.html
+          echo "			opacity: 0.8;" >> index.html
+          echo "			letter-spacing: 8px;" >> index.html
+          echo "			-webkit-transform: rotateY(0deg) translateZ(100px);" >> index.html
+          echo "		  }" >> index.html
+          echo "		" >> index.html
+          echo "		}" >> index.html
+          echo "		@keyframes anim {" >> index.html
+          echo "		  0% {" >> index.html
+          echo "			text-shadow: 0 0 50px #fff;" >> index.html
+          echo "			letter-spacing: 80px;" >> index.html
+          echo "			opacity: 0;" >> index.html
+          echo "			-moz-transform: rotateY(-90deg);" >> index.html
+          echo "		  }" >> index.html
+          echo "		  50% {" >> index.html
+          echo "			text-shadow: 0 0 1px #fff;" >> index.html
+          echo "			opacity: 0.8;" >> index.html
+          echo "			-moz-transform: rotateY(0deg);" >> index.html
+          echo "		  }" >> index.html
+          echo "		  75% {" >> index.html
+          echo "			text-shadow: 0 0 1px #fff;" >> index.html
+          echo "			opacity: 0.8;" >> index.html
+          echo "			-moz-transform: rotateY(0deg) translateZ(60px);" >> index.html
+          echo "		  }" >> index.html
+          echo "		  100% {" >> index.html
+          echo "			text-shadow: 0 0 1px #fff;" >> index.html
+          echo "			opacity: 0.8;" >> index.html
+          echo "			letter-spacing: 8px;" >> index.html
+          echo "			-moz-transform: rotateY(0deg) translateZ(100px);" >> index.html
+          echo "		  }" >> index.html
+          echo "		" >> index.html
+          echo "		}</style>" >> index.html
+          echo "</head>" >> index.html
+          echo "<body>" >> index.html
+          echo "		<div id="main">" >> index.html
+          echo "		<h1>This is <strong>Joseph Sarpong's</strong> udagram project</h1>" >> index.html
+          echo "		<h3>it works! Udagram, Udacity</h3>" >> index.html
+          echo "		<h5>I am happy that it works! ALX-Udagram</h5>" >> index.html
+          echo "		<P>You can check the link below to see the script in repo!</P>" >> index.html
+          echo "		<a href="https://github.com/KwesiJoe/udagram"  target="_blank">Repo</a>" >> index.html
+          echo "		</div>" >> index.html
+          echo "</body" >> index.html
+          echo "</html>" >> index.html
+
+      ImageId: !Ref EC2InstanceAMI
+      SecurityGroups:
+        - Ref: WebServerSecGroup
+      InstanceType: t2.micro
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sdk"
+          Ebs:
+            VolumeSize: "10"
+  # AutoScaling group
+  WebAppGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-PRIVATE1-SUBNETS"
+        - Fn::ImportValue: !Sub "${EnvironmentName}-PRIVATE2-SUBNETS"
+      LaunchConfigurationName:
+        Ref: WebAppLaunchConfig
+      MinSize: "4"
+      MaxSize: "5"
+      TargetGroupARNs:
+        - Ref: WebAppTargetGroup
+
+  # Application loadbalancer
+  WebAppLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-PUBLIC1-SUBNETS"
+        - Fn::ImportValue: !Sub "${EnvironmentName}-PUBLIC2-SUBNETS"
+      SecurityGroups:
+        - Ref: LoadBalancerSG
+  # load balancer listener
+  LBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: WebAppTargetGroup
+      LoadBalancerArn:
+        Ref: WebAppLB
+      Port: "80"
+      Protocol: HTTP
+  ALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref "WebAppTargetGroup"
+      Conditions:
+        - Field: path-pattern
+          Values: [/]
+      ListenerArn: !Ref "LBListener"
+      Priority: 1
+
+  # laod balancer target group
+  WebAppTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 35
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 6
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: "${EnvironmentName}-VPC"
+
+Outputs:
+  LoadBalancer:
+    Description: Output referene for the load balancer
+    Value: !Ref WebAppLB
+
+  LoadBalancerUrl:
+    Description: The loadbalancer url
+    Value: !Join ["", ["http://", !GetAtt WebAppLB.DNSName]]
