@@ -1,7 +1,8 @@
 # udagram
 
 ## A Minimal instagram
-======================
+
+
 This project deploys the infrastructure shown on below
 
 ![alt text](infrastructure.jpeg "Infrastructure Diagram")
